@@ -22,8 +22,53 @@
 using namespace std;
 using namespace llvm;
 
-void findMalloc(Value *v){
 
+Value* fromAlloca(Value *alloca){
+    errs() << "它的 User 有" << "\n";
+    for(auto u = alloca->user_begin(); u != alloca->user_end(); u++){
+        u->printAsOperand(errs()); errs() << "\n";
+        if(isa<StoreInst>(*u)){
+            errs() << "是 StoreInst" << "\n";
+            StoreInst* store_inst = cast<StoreInst>(*u);
+            Value* vop = store_inst->getValueOperand();
+            errs() << "其第一个操作数" << "\n";
+            errs() << *vop << "\n";
+            if(isa<CastInst>(*vop)){
+                errs() << "是 CastInst" << "\n";
+                Value* cv = cast<CastInst>(*vop).getOperand(0);
+                errs() << "应该是malloc那条instruction了" << *cv << "\n"; // 第一个参数
+                return cv;
+            }else if(isa<Instruction>(*vop)){
+                while(isa<Instruction>(*vop)){
+                    errs() << "不是 CastInst" << "\n";
+                    Instruction* inst_vop = cast<Instruction>(vop);
+                    errs() << "其第一个操作数" << "\n";
+                    vop = inst_vop->getOperand(0);
+                    errs() << *vop << "\n"; // 第一个参数
+                    if(isa<AllocaInst>(*vop)){
+                        errs() << "是 AllocaInst" << "\n";
+                        return fromAlloca(vop);
+                        break;
+                    }
+                }
+            } 
+        }
+    }
+}
+
+Value* findMalloc(Value *v){
+    Value *op0 = v;
+    while(isa<Instruction>(*op0)){
+        errs() << "是 Instruction" << "\n";
+        Instruction* inst_op0 = cast<Instruction>(op0);
+        op0 = inst_op0->getOperand(0);
+        errs() << "其第一个操作数" << "\n";
+        errs() << *op0 << "\n"; // 第一个参数
+        if(isa<AllocaInst>(*op0)){
+            errs() << "是 AllocaInst" << "\n";
+            return fromAlloca(op0);
+        }
+    }
 }
 
 // main process
@@ -60,57 +105,12 @@ int main(int argc, char** argv) {
                             Value *op0 = inst->getArgOperand(0);
                             errs() << *op0 << "\n"; // 第一个参数
                             // errs() << *(op0->getType()) << "\n";
-                            while(isa<Instruction>(*op0)){
-                                errs() << "是 Instruction" << "\n";
-                                Instruction* inst_op0 = cast<Instruction>(op0);
-                                errs() << "其第一个操作数" << "\n";
-                                op0 = inst_op0->getOperand(0);
-                                errs() << *op0 << "\n"; // 第一个参数
-                                if(isa<AllocaInst>(*op0)){
-                                    errs() << "是 AllocaInst" << "\n";
-                                    errs() << "它的 User 有" << "\n";
-                                    for(auto u = op0->user_begin(); u != op0->user_end(); u++){
-                                        u->printAsOperand(errs()); errs() << "\n";
-                                        if(isa<StoreInst>(*u)){
-                                            errs() << "是 StoreInst" << "\n";
-                                            StoreInst* store_inst = cast<StoreInst>(*u);
-                                            Value* vop = store_inst->getValueOperand();
-                                            errs() << "其第一个操作数" << "\n";
-                                            errs() << *vop << "\n";
-                                            if(isa<CastInst>(*vop)){
-                                                errs() << "是 CastInst" << "\n";
-                                                Value* cv = cast<CastInst>(*vop).getOperand(0);
-                                                errs() << *cv << "\n"; // 第一个参数
-                                            }else if(isa<Instruction>(*vop)){
-                                                while(isa<Instruction>(*vop)){
-                                                    errs() << "不是 CastInst" << "\n";
-                                                    Instruction* inst_vop = cast<Instruction>(vop);
-                                                    errs() << "其第一个操作数" << "\n";
-                                                    vop = inst_vop->getOperand(0);
-                                                    errs() << *vop << "\n"; // 第一个参数
-                                                    if(isa<AllocaInst>(*vop)){
-                                                        errs() << "是 AllocaInst" << "\n";
-                                                        break;
-                                                    }
-                                                }
-                                            } 
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
+                            Value* mallocValue = findMalloc(op0);
                         }else if(called->getName().contains(StringRef("malloc"))){
                             errs() << "\n" << called->getName() << "\n";    // 函数名称
                             inst->printAsOperand(errs()); errs() << "\n";   //编号
-                            errs() << "第一个参数" << "\n";
-                            Value *op0 = inst->getArgOperand(0);
-                            errs() << *op0 << "\n"; // 第一个参数
-                            // errs() << *(op0->getType()) << "\n";
-                            // errs() << op0->getValueID() << "\n";
                         }
-		    }
-
-
+		            }
                 }
     // write back IR .bc file
     errs() << "\nverifying...\n";
