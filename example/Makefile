@@ -1,5 +1,13 @@
 CHANGE=../MPI_change
 
+# Path
+C_SRC_DIR := ./c_bench
+C_BUILD_DIR := ./c_build
+C_OBJ_DIR := $(C_BUILD_DIR)/obj
+
+C_SRCS := $(wildcard $(C_SRC_DIR)/*.c)
+C_BCC := $(C_SRCS:$(C_SRC_DIR)/%.c=$(C_BUILD_DIR)/%.bcc)
+
 # original makefile
 default: test_orig
 
@@ -9,8 +17,18 @@ test_orig: test.cpp
 # 	clang++ -I /usr/include/mpi -emit-llvm -S $^ -o $@.ll
 
 # MPI_change makefile
-change: test_change test_struct_change
+change: test_change test_struct_change $(C_BCC)
 	@echo "finished"
+
+$(C_BUILD_DIR)/%.bcc: $(C_BUILD_DIR)/%.bc
+	@mkdir -p $(C_BUILD_DIR)
+	$(CHANGE) $^ > $@ 2>$@_stderr.txt
+
+$(C_BUILD_DIR)/%.bc: $(C_SRC_DIR)/%.c
+	@mkdir -p $(C_BUILD_DIR)
+	clang -I /usr/include/mpi -emit-llvm -c $^ -o $@
+	clang -I /usr/include/mpi -emit-llvm -S $^ -o $@.ll
+
 
 test_change: test.bcc
 
@@ -34,3 +52,4 @@ test_struct_change: test_struct.bcc
 .PHONY: clean
 clean:
 	rm -f *.o *.ll *.bc *.bcc *.s
+	rm -rf $(C_BUILD_DIR)
