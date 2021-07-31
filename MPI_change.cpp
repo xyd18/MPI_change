@@ -25,11 +25,12 @@ using namespace llvm;
 Value* fromAlloca(Value *alloca);
 Value* findMalloc(Value *v);
 
-Value* findNearestUser(Value *v, Instruction *inst){
-    // 找到 inst 前面最近的一条 StoreInst 或 CallInst
+// Value* findNearestUser(Value *v, Instruction *inst){
+//     // 找到 inst 前面最近的一条 StoreInst 或 CallInst
 
-    return null;
-}
+//     return null;
+// }
+
 
 Value* fromFunc(Function* func, int argsNum){
     errs() << "它的 User 有" << "\n";
@@ -72,8 +73,9 @@ Value* fromStore2(StoreInst *store){
 
 Value* fromStore(StoreInst *store){
     Value* vop = store->getValueOperand();
-    errs() << "其第一个操作数" << "\n";
+    errs() << "其第一个操作数 类型是" << *(vop->getType()) << "\n";
     errs() << *vop << "\n";
+    
     if(isa<CastInst>(*vop)){
         errs() << "是 CastInst" << "\n";
         Value* cv = cast<CastInst>(*vop).getOperand(0);
@@ -151,9 +153,8 @@ Value* fromAlloca(Value *alloca){
             for(auto args = calli->arg_begin(); args != calli->arg_end(); args++){
                 if(isa<AllocaInst>(*args)){
                     if(cast<Value>(*args) == alloca){
-                        errs() << *cast<Value>(*args) << "\n";
                         argsNum = args-calli->arg_begin();
-                        errs() << argsNum << "\n";
+                        errs() <<"是第 " <<argsNum << "个参数\n";
 
                     }
                 }
@@ -191,13 +192,65 @@ Value* fromAlloca(Value *alloca){
     }
 }
 
+
+int isFunctionArg(Value* v, Function* func){
+    // 判断是不是函数参数，是第几个参数
+    int argNum = 0;
+    bool isArg = false;
+
+    for(auto args = func->arg_begin(); args != func->arg_end(); args++){
+        if(cast<Value>(v) == cast<Value>(args)){
+            isArg = true;
+            // errs() << cast<Value>(*args) << "\n";
+            argNum = args - func->arg_begin();
+            errs() << " 是函数 " << func->getName() << " 的第 "<< argNum << " 个参数\n";
+            break;
+        }
+    }
+
+    if(isArg)
+        return argNum;
+    else
+        return -1;
+}
+
+Value* toI8Ptr(Value* v){
+    // v : i8*
+    if(isa<CallInst>(*v)){
+
+    }else if(isa<LoadInst>(*v)){
+
+    }else if(isa<CastInst>(*v) || isa<GetElementPtrInst>(*v)){
+
+    }else{
+        // 判断是不是当前函数的参数
+        if(isa<Instruction>(*v)){
+            Function* func = cast<Instruction>(v)->getFunction();
+            int ArgNum = isFunctionArg(v, func);
+            if(ArgNum == -1){
+                // 不是
+            }else{
+                // 是
+
+            }
+        }else{
+
+        }
+
+    }
+}
+
+
 Value* findMalloc(Value *v){
+    
     Value *op0 = v;
     if(isa<CallInst>(*op0)){
         CallInst* call_inst = cast<CallInst>(op0);
-        errs() << "是 CallInst 的返回值" << "\n";
         Function* called = call_inst->getCalledFunction(); // Returns the function called, or null if this is an indirect function invocation.
-        errs() << "调用了" << called->getName() << "\n";
+        errs() << "是 CallInst 的返回值, CallInst 调用了" << called->getName() << "\n";
+        if(called->getName().contains(StringRef("malloc"))){
+            return op0;
+        }
         for (BasicBlock & bb : *called){
             for (Instruction & i : bb) {
                 errs() << i << "\n";
@@ -225,6 +278,7 @@ Value* findMalloc(Value *v){
                         while(isa<Instruction>(*rv)){
                             Instruction* inst_rv = cast<Instruction>(rv);
                             rv = inst_rv->getOperand(0);
+                            errs() << inst_rv->getOpcodeName() << "\n";
                             errs() << "其第一个操作数" << "\n";
                             errs() << *rv << "\n"; // 第一个参数
                             if(isa<AllocaInst>(*rv)){
@@ -240,17 +294,11 @@ Value* findMalloc(Value *v){
                                         errs() << *vop << "\n";
                                         // 判断是不是函数参数
                                         Function* func = store_inst->getFunction();
-                                        for(auto args = func->arg_begin(); args != func->arg_end(); args++){
-                                            if(cast<Value>(vop) == cast<Value>(args)){
-                                                isArg = true;
-                                                errs() << cast<Value>(*args) << "\n";
-                                                argsNum = args-func->arg_begin();
-                                                errs() << " 是第 "<< argsNum << " 个参数\n";
-                                                break;
-                                            }
-                                        }
-                                        if(isArg)
+                                        argsNum = isFunctionArg(vop, func);
+                                        if(argsNum != -1){
+                                            isArg = true;
                                             break;
+                                        }
                                     }
                                 }
                                 if(isArg)
@@ -258,9 +306,8 @@ Value* findMalloc(Value *v){
                             }
                         }
                         if(isArg){
-                            errs() << " 是第 "<< argsNum << " 个参数\n";
                             Value* realV = call_inst->getArgOperand(argsNum);
-                            errs() << *realV << "\n";
+                            errs() << "参数是 " << *realV << "\n";
                             if(isa<LoadInst>(*realV)){
                                 errs() << "是 LoadInst" << "\n";
                                 Value* vv = cast<Instruction>(realV)->getOperand(0);
@@ -306,8 +353,8 @@ Value* findMalloc(Value *v){
             errs() << "是 Instruction 且不是 CallInst" << "\n";
             Instruction* inst_op0 = cast<Instruction>(op0);
             op0 = inst_op0->getOperand(0);
-            errs() << "其第一个操作数" << "\n";
-            errs() << *op0 << "\n"; // 第一个参数
+            errs() << "其第一个操作数 类型是" << *(op0->getType()) << "\n";
+            errs() << *op0 << "\n"; // 第一个操作数
             if(isa<AllocaInst>(*op0)){
                 errs() << "是 AllocaInst" << "\n";
                 return fromAlloca(op0);
@@ -343,17 +390,15 @@ int main(int argc, char** argv) {
                         Function* called = inst->getCalledFunction(); // Returns the function called, or null if this is an indirect function invocation.
 						if(called->getName().contains(StringRef("MPI_Send"))){
                             errs() << "\n";
-                            inst->printAsOperand(errs());
-                            errs() << " [调用函数]" << called->getName() << "\n";    // 函数名称
-                            errs() << "MPI_Send第一个参数" << "\n";
-                            Value *op0 = inst->getArgOperand(0);
-                            errs() << *op0 << "\n"; // 第一个参数
-                            // errs() << *(op0->getType()) << "\n";
+                            inst->printAsOperand(errs()); errs() << " [调用函数]" << called->getName() << "\n";    // 函数名称
+                            Value *op0 = inst->getArgOperand(0); // MPI_Send第一个参数
+                            errs() << "MPI_Send第一个参数" << " 类型是" << *(op0->getType()) << "\n";
+                            errs() << *op0 << "\n";
                             Value* mallocValue = findMalloc(op0);
                             // TODO: 需要换成另一个函数
                         }else if(called->getName().contains(StringRef("malloc"))){
-                            errs() << "\n" << called->getName() << "\n";    // 函数名称
-                            inst->printAsOperand(errs()); errs() << "\n";   //编号
+                            // errs() << "\n" << called->getName() << "\n";    // 函数名称
+                            // inst->printAsOperand(errs()); errs() << "\n";   //编号
                         }
 		            }
                 }
