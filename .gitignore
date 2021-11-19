@@ -1,4 +1,8 @@
 .DS_Store
+.vscode
+.dot
+.png
+.txt
 
 # Prerequisites
 *.d

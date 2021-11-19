@@ -3,7 +3,7 @@ CHANGE=../MPI_change
 # Path
 C_SRC_DIR := ./c_bench
 C_BUILD_DIR := ./c_build
-C_OBJ_DIR := $(C_BUILD_DIR)/obj
+# C_OBJ_DIR := $(C_BUILD_DIR)/obj
 
 C_SRCS := $(wildcard $(C_SRC_DIR)/*.c)
 C_BCC := $(C_SRCS:$(C_SRC_DIR)/%.c=$(C_BUILD_DIR)/%.bcc)
@@ -18,7 +18,7 @@ test_orig: test.cpp
 
 # MPI_change makefile
 change: test_change test_struct_change $(C_BCC)
-	@echo "finished"
+	@echo "\033[36mfinished\033[0m"
 
 $(C_BUILD_DIR)/%.bcc: $(C_BUILD_DIR)/%.bc
 	@mkdir -p $(C_BUILD_DIR)
@@ -30,15 +30,16 @@ $(C_BUILD_DIR)/%.bc: $(C_SRC_DIR)/%.c
 	clang -I /usr/include/mpi -emit-llvm -S $^ -o $@.ll
 
 
-test_change: test.bcc
 
-test_struct_change: test_struct.bcc
-# test_change: test.s
-# 	clang++ -I /usr/include/mpi -lrt -lpthread $^ -o $@
+test_struct_change: test_struct.s my_send.s mem_manager.s
+	clang++ -I /usr/include/mpi -lrt -lpthread $^ -o $@
 
-# %.s: %.bcc
-# 	llc $^ -o $@
-# 	llvm-dis $^ -o $^.ll
+test_change: test.s my_send.s mem_manager.s
+	clang++ -I /usr/include/mpi -lrt -lpthread $^ -o $@
+
+%.s: %.bcc
+	llc $^ -o $@
+	llvm-dis $^ -o $^_after.ll
 
 %.bcc: %.bc
 	$(CHANGE) $^ > $@ 2>$@_stderr.txt

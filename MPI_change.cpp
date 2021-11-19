@@ -17,19 +17,21 @@
 #include <sstream>
 #include <fstream>
 
-#include "common.h"
+// #include "common.h"
 
 using namespace std;
 using namespace llvm;
 
+unique_ptr<Module> m;
+
 Value* fromAlloca(Value *alloca);
 Value* findMalloc(Value *v);
 
-Value* findNearestUser(Value *v, Instruction *inst){
-    // 找到 inst 前面最近的一条 StoreInst 或 CallInst
+// Value* findNearestUser(Value *v, Instruction *inst){
+//     // 找到 inst 前面最近的一条 StoreInst 或 CallInst
 
-    return null;
-}
+//     return nulls;
+// }
 
 Value* fromFunc(Function* func, int argsNum){
     errs() << "它的 User 有" << "\n";
@@ -42,6 +44,8 @@ Value* fromFunc(Function* func, int argsNum){
             return findMalloc(arg);
         }
     }
+    errs() << "【BUG】\n";
+    return nullptr;
 }
 
 Value* fromLoad(Value *load){
@@ -58,6 +62,8 @@ Value* fromAlloca2(Value *alloca){
             return fromLoad(load_inst);
         }
     }
+    errs() << "【BUG】\n";
+    return nullptr;
 }
 
 Value* fromStore2(StoreInst *store){
@@ -68,6 +74,8 @@ Value* fromStore2(StoreInst *store){
         errs() << "是 AllocaInst" << "\n";
         return fromAlloca2(vop);
     }
+    errs() << "【BUG】\n";
+    return nullptr;
 }
 
 Value* fromStore(StoreInst *store){
@@ -93,7 +101,7 @@ Value* fromStore(StoreInst *store){
     else if(isa<Instruction>(*vop)){
         errs() << "不是 CastInst 也不是 CallInst" << "\n";
         bool isArg = false;
-        Instruction *inst = cast<Instruction>(vop);
+        // Instruction *inst = cast<Instruction>(vop);
         Function* func = store->getFunction();
         errs() << "函数名称 " << func->getName() << "\n";
         int argsNum = 0;
@@ -127,6 +135,8 @@ Value* fromStore(StoreInst *store){
         }
         
     }
+    errs() << "【BUG】\n";
+    return nullptr;
 }
 
 
@@ -189,6 +199,8 @@ Value* fromAlloca(Value *alloca){
             //     }
         }
     }
+    errs() << "【BUG】\n";
+    return nullptr;
 }
 
 Value* findMalloc(Value *v){
@@ -274,7 +286,7 @@ Value* findMalloc(Value *v){
                                         bool yes = true;
                                         if(store_inst->getParent() == cast<Instruction>(realV)->getParent()){
                                             BasicBlock* parent = store_inst->getParent();
-                                            unsigned Order = 0;
+                                            // unsigned Order = 0;
                                             for (Instruction &I : *parent){
                                                 if(&I == store_inst){
                                                     yes = true;
@@ -314,6 +326,22 @@ Value* findMalloc(Value *v){
             }
         }
     }
+    errs() << "【BUG】\n";
+    return nullptr;
+}
+
+CallInst* genCallInst(CallInst* before, string name){
+    vector<Value*> newArgs;
+    for (User::op_iterator arg = before->arg_begin(); arg != before->arg_end(); ++arg) {
+        Value* ValuePtrArg = cast<Value>(arg);
+        newArgs.push_back(ValuePtrArg);
+    }
+
+    Function* old_func = before->getCalledFunction(); // Returns the function called, or null if this is an indirect function invocation.
+    Function* my_func = Function::Create(old_func->getFunctionType(), GlobalValue::ExternalLinkage, name, &(*m));
+    CallInst* after = CallInst::Create(my_func, ArrayRef<Value*>(newArgs));
+    errs() << *after << "\n";
+    return after;
 }
 
 // main process
@@ -331,9 +359,9 @@ int main(int argc, char** argv) {
     // handle IR .bc file
     unique_ptr<MemoryBuffer> mb = ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(argv[1])));
     LLVMContext context;
-    unique_ptr<Module> m = ExitOnErr(parseBitcodeFile(*mb.get(), context));
+    m = ExitOnErr(parseBitcodeFile(*mb.get(), context));
     errs() << "\nprocessing...\n";
-    // vector< pair<Instruction *, Instruction *> > toDel;
+    vector< pair<Instruction *, Instruction *> > toDel;
     // GlobalVariable * gvar_ivt = new GlobalVariable(*m, Type::getInt64Ty(context), false, GlobalValue::ExternalLinkage, 0, "g__ivt");
     for (Function & f : (*m))
         if (!f.isDeclaration())
@@ -350,16 +378,71 @@ int main(int argc, char** argv) {
                             errs() << *op0 << "\n"; // 第一个参数
                             // errs() << *(op0->getType()) << "\n";
                             Value* mallocValue = findMalloc(op0);
-                            // TODO: 需要换成另一个函数
+                            
+                            // 把 malloc 换成 my_malloc
+                            errs() << "把 malloc 换成 my_malloc\n";
+                            CallInst* malloc_inst = cast<CallInst>(mallocValue);
+
+                            // CallInst* my_malloc_inst = genCallInst(malloc_inst, "_Z9my_malloci");
+                            vector<Value*> newMallocArgs;
+                            for (User::op_iterator arg = malloc_inst->arg_begin(); arg != malloc_inst->arg_end(); ++arg) {
+                                Value* ValuePtrArg = cast<Value>(arg);
+                                newMallocArgs.push_back(ValuePtrArg);
+                            }
+
+                            Function* old_malloc = malloc_inst->getCalledFunction(); // Returns the function called, or null if this is an indirect function invocation.
+                            Function* my_malloc = Function::Create(old_malloc->getFunctionType(), GlobalValue::ExternalLinkage, "_Z9my_malloci", &(*m));
+                            CallInst* my_malloc_inst = CallInst::Create(my_malloc, ArrayRef<Value*>(newMallocArgs));
+                            errs() << *my_malloc_inst << "\n";
+                            toDel.push_back(pair<Instruction *, Instruction *>(malloc_inst, my_malloc_inst));
+
+                            // 把 MPI_Send 换成 my_send
+                            errs() << "把 MPI_Send 换成 my_send\n";
+                            CallInst* newCallInst = genCallInst(inst, "_Z7my_sendiiPvi");
+                            // Function* newFunc = Function::Create(called->getFunctionType(), GlobalValue::ExternalLinkage, "_Z7my_sendiiPvi", &(*m));
+                            // CallInst* newCallInst = CallInst::Create(newFunc);
+                            // errs() << *newCallInst << "\n";
+                            toDel.push_back(pair<Instruction *, Instruction *>(inst, newCallInst));
+
                         }else if(called->getName().contains(StringRef("malloc"))){
                             errs() << "\n" << called->getName() << "\n";    // 函数名称
                             inst->printAsOperand(errs()); errs() << "\n";   //编号
+                        }else if(called->getName().contains(StringRef("MPI_Recv"))){
+                            // 把 MPI_Recv 换成 my_recv
+                            errs() << "\n" << called->getName() << "\n";    // 函数名称
+                            inst->printAsOperand(errs()); errs() << "\n";   //编号
+                            CallInst* newCallInst = genCallInst(inst, "_Z7my_recviiPvi");
+                            // Function* newFunc = Function::Create(called->getFunctionType(), GlobalValue::ExternalLinkage, "_Z7my_recviiPvi", &(*m));
+                            // CallInst* newCallInst = CallInst::Create(newFunc);
+                            // errs() << *newCallInst << "\n";
+                            toDel.push_back(pair<Instruction *, Instruction *>(inst, newCallInst));
+                        }else if(called->getName().equals(StringRef("free"))){
+                            // 把 free 换成 myfree
+                            errs() << "\n" << called->getName() << "\n";    // 函数名称
+                            inst->printAsOperand(errs()); errs() << "\n";   //编号
+                            CallInst* newCallInst = genCallInst(inst, "_Z7my_freePv");
+                            // Function* newFunc = Function::Create(called->getFunctionType(), GlobalValue::ExternalLinkage, "_Z7my_freePv", &(*m));
+                            // CallInst* newCallInst = CallInst::Create(newFunc);
+                            // errs() << *newCallInst << "\n";
+                            toDel.push_back(pair<Instruction *, Instruction *>(inst, newCallInst));
                         }
 		            }
                 }
+    // actually remove or replace instructions
+    errs() << "\nhandling...\n";
+    for (pair<Instruction *, Instruction *> i : toDel) {
+        if (i.second == nullptr) {
+            errs() << "Erasing " << *(i.first) << "\n";
+            i.first->eraseFromParent();
+        } else {
+            errs() << "Replacing " << *(i.first) << " with " << *(i.second) << "\n";
+            BasicBlock::iterator ii(i.first);
+            ReplaceInstWithInst(i.first->getParent()->getInstList(), ii, i.second);
+        }
+    }
     // write back IR .bc file
     errs() << "\nverifying...\n";
     verifyModule(*m, &errs());
-    WriteBitcodeToFile(m.get(), outs());
+    WriteBitcodeToFile(*m, outs());
     return 0;
 }
