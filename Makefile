@@ -1,4 +1,4 @@
-LLVM_CONFIG=llvm-config
+LLVM_CONFIG=/usr/lib/llvm-10/bin/llvm-config
 
 CXX=clang++
 
@@ -32,7 +32,8 @@ default: $(TARGETS)
 $(MY_SEND_BUILD_DIR)/%.s: $(MY_SEND_SRC_DIR)/%.cpp
 	@mkdir -p $(MY_SEND_BUILD_DIR)
 	@echo "\033[36mgenerate $*.s\033[0m"
-	$(QUIET)clang++ -I /usr/include/mpi -I /usr/include/boost -I /usr/local/include -S $^ -o $@
+	# $(QUIET)clang++ -I /usr/include/mpi -I /usr/include/boost -I /usr/local/include -S $^ -o $@
+	$(QUIET)clang++ -I /usr/include/x86_64-linux-gnu/mpich/ -I /usr/include/boost -I /usr/local/include -S $^ -o $@
 	# mv $(MY_SEND_BUILD_DIR)/$*.s ./example/$*.s
 
 %.o: %.cpp

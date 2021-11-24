@@ -22,9 +22,7 @@ sudo apt install ninja-build
     参考
     1. [Getting Started with the LLVM System](https://llvm.org/docs/GettingStarted.html#getting-the-source-code-and-building-llvm)
     2. [构建clang](https://mirrors.gitcode.host/FuchsiaOS/FuchsiaOS-docs-zh_CN/development/build/toolchain.html)
-
     步骤
-
     1. 浅克隆并使用release/13分支
         `git clone --depth 1 -b release/13.x https://github.com/llvm/llvm-project.git`
     2. 使用`ninja`      
@@ -35,13 +33,16 @@ sudo apt install ninja-build
         ```bash
         cd llvm-project
         mkdir build && cd build
-
         cmake -G Ninja -DLLVM_ENABLE_PROJECTS="llvm"  -DLLVM_TARGETS_TO_BUILD="X86, ARM"  -DLLVM_ENABLE_LLD=ON  ../llvm
-
         cmake --build .
-
         ```
 </details>
 
 
+## mpich
 
+`sudo apt install mpich`
+
+## makefile
+
+修改makefile中关于llvm-config和mpi.h的路径即可
