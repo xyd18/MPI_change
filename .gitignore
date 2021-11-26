@@ -41,3 +41,7 @@
 build/
 CMakeFiles/
 CMakeCache.txt
+my_send_build/
+*.s
+MPI_change
+test.bc*

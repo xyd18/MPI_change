@@ -1,5 +1,7 @@
 CHANGE=../MPI_change
 
+
+
 # Path
 C_SRC_DIR := ./c_bench
 C_BUILD_DIR := ./c_build
@@ -12,7 +14,8 @@ C_BCC := $(C_SRCS:$(C_SRC_DIR)/%.c=$(C_BUILD_DIR)/%.bcc)
 default: test_orig
 
 test_orig: test.cpp
-	clang++ -I /usr/include/mpi test.cpp -o test
+	clang++ -I $(MPI_ROOT)/include  -o test test.cpp
+# clang++ -I /usr/include/mpi test.cpp -o test
 # 	clang++ -I /usr/include/mpi -emit-llvm -c test.cpp -o test.bc
 # 	clang++ -I /usr/include/mpi -emit-llvm -S $^ -o $@.ll
 
@@ -26,28 +29,28 @@ $(C_BUILD_DIR)/%.bcc: $(C_BUILD_DIR)/%.bc
 
 $(C_BUILD_DIR)/%.bc: $(C_SRC_DIR)/%.c
 	@mkdir -p $(C_BUILD_DIR)
-	clang -I /usr/include/mpi -emit-llvm -c $^ -o $@
-	clang -I /usr/include/mpi -emit-llvm -S $^ -o $@.ll
+	clang -I $(MPI_ROOT)/include -emit-llvm -c $^ -o $@
+	clang -I $(MPI_ROOT)/include -emit-llvm -S $^ -o $@.ll
 
 
 
 test_struct_change: test_struct.s my_send.s mem_manager.s
-	clang++ -I /usr/include/mpi -lrt -lpthread $^ -o $@
+	clang++ -I $(MPI_ROOT)/include -lrt -lpthread $^ -o $@
 
 test_change: test.s my_send.s mem_manager.s
-	clang++ -I /usr/include/mpi -lrt -lpthread $^ -o $@
+	clang++ -I $(MPI_ROOT)/include -lrt -lpthread $^ -o $@
 
 %.s: %.bcc
-	llc $^ -o $@
-	llvm-dis $^ -o $^_after.ll
+	llc-10 $^ -o $@
+	llvm-dis-10 $^ -o $^_after.ll
 
 %.bcc: %.bc
 	$(CHANGE) $^ > $@ 2>$@_stderr.txt
 
 
 %.bc: %.cpp
-	clang++ -I /usr/include/mpi -emit-llvm -c $^ -o $@
-	clang++ -I /usr/include/mpi -emit-llvm -S $^ -o $@.ll
+	clang++ -I $(MPI_ROOT)/include  -emit-llvm -c $^ -o $@
+	clang++ -I $(MPI_ROOT)/include  -emit-llvm -S $^ -o $@.ll
 
 # cleaning
 .PHONY: clean

@@ -444,5 +444,6 @@ int main(int argc, char** argv) {
     errs() << "\nverifying...\n";
     verifyModule(*m, &errs());
     WriteBitcodeToFile(*m, outs());
+    errs() << "\nDone!...";
     return 0;
 }
