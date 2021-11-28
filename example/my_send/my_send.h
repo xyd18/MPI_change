@@ -18,5 +18,5 @@ int open_mem(int bytes);
 // int get_or_set_offset(void* addr, int offset);
 int get_offset(void* addr);
 void set_offset(void* addr, int offset, int bytes);
-void myfree(void*);
+void my_free(void*);
 #endif // !_MY_SEND_

@@ -22,7 +22,6 @@
 using namespace std;
 using namespace llvm;
 
-unique_ptr<Module> m;
 
 Value* fromAlloca(Value *alloca);
 Value* findMalloc(Value *v);
@@ -330,19 +329,20 @@ Value* findMalloc(Value *v){
     return nullptr;
 }
 
-CallInst* genCallInst(CallInst* before, string name){
-    vector<Value*> newArgs;
-    for (User::op_iterator arg = before->arg_begin(); arg != before->arg_end(); ++arg) {
-        Value* ValuePtrArg = cast<Value>(arg);
-        newArgs.push_back(ValuePtrArg);
-    }
+#define ARRAYREF(before) \
+    vector<Value*> newArgs; \
+    for (User::op_iterator arg = before->arg_begin(); arg != before->arg_end(); ++arg) { \
+        Value* ValuePtrArg = cast<Value>(arg); \
+        newArgs.push_back(ValuePtrArg); \
+    } \
+    ArrayRef<Value*> args(newArgs);
 
-    Function* old_func = before->getCalledFunction(); // Returns the function called, or null if this is an indirect function invocation.
-    Function* my_func = Function::Create(old_func->getFunctionType(), GlobalValue::ExternalLinkage, name, &(*m));
-    CallInst* after = CallInst::Create(my_func, ArrayRef<Value*>(newArgs));
+#define NEWCALLINST(before, name) \
+    ARRAYREF(before) \
+    Function* old_func = before->getCalledFunction(); \
+    Function* my_func = Function::Create(old_func->getFunctionType(), GlobalValue::ExternalLinkage, name, &(*m)); \
+    CallInst* after = CallInst::Create(my_func, args); \
     errs() << *after << "\n";
-    return after;
-}
 
 // main process
 ExitOnError ExitOnErr;
@@ -359,7 +359,7 @@ int main(int argc, char** argv) {
     // handle IR .bc file
     unique_ptr<MemoryBuffer> mb = ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(argv[1])));
     LLVMContext context;
-    m = ExitOnErr(parseBitcodeFile(*mb.get(), context));
+    unique_ptr<Module> m = ExitOnErr(parseBitcodeFile(*mb.get(), context));
     errs() << "\nprocessing...\n";
     vector< pair<Instruction *, Instruction *> > toDel;
     // GlobalVariable * gvar_ivt = new GlobalVariable(*m, Type::getInt64Ty(context), false, GlobalValue::ExternalLinkage, 0, "g__ivt");
@@ -397,12 +397,13 @@ int main(int argc, char** argv) {
                             toDel.push_back(pair<Instruction *, Instruction *>(malloc_inst, my_malloc_inst));
 
                             // 把 MPI_Send 换成 my_send
-                            errs() << "把 MPI_Send 换成 my_send\n";
-                            CallInst* newCallInst = genCallInst(inst, "_Z7my_sendiiPvi");
+                            NEWCALLINST(inst, "_Z7my_sendiiPvi")
+                            
+                            // CallInst* newCallInst = genCallInst(inst, "_Z7my_sendiiPvi");
                             // Function* newFunc = Function::Create(called->getFunctionType(), GlobalValue::ExternalLinkage, "_Z7my_sendiiPvi", &(*m));
-                            // CallInst* newCallInst = CallInst::Create(newFunc);
+                            // CallInst* newCallInst = CallInst::Create(newFunc, args);
                             // errs() << *newCallInst << "\n";
-                            toDel.push_back(pair<Instruction *, Instruction *>(inst, newCallInst));
+                            toDel.push_back(pair<Instruction *, Instruction *>(inst, after));
 
                         }else if(called->getName().contains(StringRef("malloc"))){
                             errs() << "\n" << called->getName() << "\n";    // 函数名称
@@ -411,20 +412,22 @@ int main(int argc, char** argv) {
                             // 把 MPI_Recv 换成 my_recv
                             errs() << "\n" << called->getName() << "\n";    // 函数名称
                             inst->printAsOperand(errs()); errs() << "\n";   //编号
-                            CallInst* newCallInst = genCallInst(inst, "_Z7my_recviiPvi");
+                            NEWCALLINST(inst, "_Z7my_recviiPvi")
+                            // CallInst* newCallInst = genCallInst(inst, "_Z7my_recviiPvi");
                             // Function* newFunc = Function::Create(called->getFunctionType(), GlobalValue::ExternalLinkage, "_Z7my_recviiPvi", &(*m));
                             // CallInst* newCallInst = CallInst::Create(newFunc);
                             // errs() << *newCallInst << "\n";
-                            toDel.push_back(pair<Instruction *, Instruction *>(inst, newCallInst));
+                            toDel.push_back(pair<Instruction *, Instruction *>(inst, after));
                         }else if(called->getName().equals(StringRef("free"))){
                             // 把 free 换成 myfree
                             errs() << "\n" << called->getName() << "\n";    // 函数名称
                             inst->printAsOperand(errs()); errs() << "\n";   //编号
-                            CallInst* newCallInst = genCallInst(inst, "_Z7my_freePv");
+                            // CallInst* newCallInst = genCallInst(inst, "_Z7my_freePv");
+                            NEWCALLINST(inst, "_Z7my_freePv")
                             // Function* newFunc = Function::Create(called->getFunctionType(), GlobalValue::ExternalLinkage, "_Z7my_freePv", &(*m));
                             // CallInst* newCallInst = CallInst::Create(newFunc);
                             // errs() << *newCallInst << "\n";
-                            toDel.push_back(pair<Instruction *, Instruction *>(inst, newCallInst));
+                            toDel.push_back(pair<Instruction *, Instruction *>(inst, after));
                         }
 		            }
                 }

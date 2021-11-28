@@ -88,7 +88,10 @@ class sigaction_helper{
 };
 sigaction_helper sh;
 
-int my_send(int dest, int tag, void* data, int bytes) {
+
+int my_send(void* data, int bytes, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm){
+
+// int my_send(int dest, int tag, void* data, int bytes) {
     int* arr = (int*)malloc(3 * sizeof(int));
     manage_divide(data, bytes);
     int offset = get_offset(data);
@@ -97,7 +100,7 @@ int my_send(int dest, int tag, void* data, int bytes) {
         exit(0);
     }
     arr[0] = bytes, arr[1] = offset;
-    int ret = MPI_Send(arr, 2, MPI_INT, dest, tag, MPI_COMM_WORLD);
+    int ret = MPI_Send(arr, 2, datatype, dest, tag, comm);
     int temp_offset = get_offset(data);
     mapToMem(temp_offset);
     free(arr);
@@ -105,10 +108,12 @@ int my_send(int dest, int tag, void* data, int bytes) {
     return ret;
 }
 
-int my_recv(int dest, int tag, void* data, int bytes) {
-    MPI_Status status;
+int my_recv(void* data, int bytes, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm, MPI_Status* status){
+
+// int my_recv(int dest, int tag, void* data, int bytes) {
+    // MPI_Status status;
     int *arr = (int*) malloc(3 * sizeof(int));
-    int ret = MPI_Recv(arr, 2, MPI_INT, dest, tag, MPI_COMM_WORLD, &status);
+    int ret = MPI_Recv(arr, 2, datatype, dest, tag, comm, status);
     int size = arr[0], offset = arr[1];
     manage_divide(data, size);
     int old_offset = get_offset(data);

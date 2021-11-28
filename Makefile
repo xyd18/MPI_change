@@ -1,4 +1,6 @@
-LLVM_CONFIG=llvm-config
+# LLVM_CONFIG=llvm-config
+LLVM_CONFIG=/usr/lib/llvm-10/bin/llvm-config
+
 
 CXX=clang++
 
@@ -14,14 +16,9 @@ CXXFLAGS+=$(COMMON_FLAGS) $(shell $(LLVM_CONFIG) --cxxflags)
 CPPFLAGS+=$(shell $(LLVM_CONFIG) --cppflags)
 LIBS+=$(shell $(LLVM_CONFIG) --libs bitreader core support nativecodegen)
 
-# Path
-MY_SEND_SRC_DIR := ./my_send
-MY_SEND_BUILD_DIR := ./my_send_build
 
-MY_SEND_SRCS := $(wildcard $(MY_SEND_SRC_DIR)/*.cpp)
-MY_SEND_S := $(MY_SEND_SRCS:$(MY_SEND_SRC_DIR)/%.cpp=$(MY_SEND_BUILD_DIR)/%.s)
 
-TARGETS= $(MY_SEND_S) MPI_change
+TARGETS= MPI_change
 
 default: $(TARGETS)
 
@@ -29,11 +26,6 @@ default: $(TARGETS)
 # 	@echo "\033[36mgenerate temp.s\033[0m"
 # 	$(QUIET)clang++ -I /usr/include/mpi -I /usr/include/boost -I /usr/local/include -S $^ -o $@
 
-$(MY_SEND_BUILD_DIR)/%.s: $(MY_SEND_SRC_DIR)/%.cpp
-	@mkdir -p $(MY_SEND_BUILD_DIR)
-	@echo "\033[36mgenerate $*.s\033[0m"
-	$(QUIET)clang++ -I /usr/include/mpi -I /usr/include/boost -I /usr/local/include -S $^ -o $@
-	# mv $(MY_SEND_BUILD_DIR)/$*.s ./example/$*.s
 
 %.o: %.cpp
 	@echo "\033[36mCompiling $*.cpp\033[0m"

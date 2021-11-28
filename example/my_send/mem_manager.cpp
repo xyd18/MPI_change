@@ -35,19 +35,29 @@ boost::interprocess::interprocess_mutex *mtx;
 class manager_helper {
 public:
     manager_helper() {
+        printf("manager_helper()1\n");
         // boost::interprocess::shared_memory_object::remove("MemManagerMemory");
         segment = boost::interprocess::managed_shared_memory(boost::interprocess::open_or_create,"MemManagerMemory",65536);
+        printf("manager_helper()2\n");
         const temp_alloc alloc_inst = temp_alloc(segment.get_segment_manager());
+        printf("manager_helper()3\n");
         mem_manager = segment.find_or_construct<vec>("memManager")(alloc_inst);
+        printf("manager_helper()4\n");
         process_num = (boost::atomic_int*)segment.allocate(sizeof(int));
+        printf("manager_helper()5\n");
         mtx = segment.find_or_construct<boost::interprocess::interprocess_mutex>("mtx")();
+        printf("manager_helper()6\n");
         *process_num = 0;
+        printf("manager_helper()7\n");
         mem_info first(0, FILE_SIZE);
+        printf("manager_helper()8\n");
         mtx->lock();
         if(mem_manager->size() == 0) {
             mem_manager->push_back(first);
         }
+        printf("manager_helper()9\n");
         mtx->unlock();
+        printf("manager_helper()10\n");
     }
     ~manager_helper() {}
 }mh;
